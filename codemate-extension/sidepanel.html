@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMate</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark">&lt;/&gt;</div>
+    <div><h1>CodeMate</h1><p>Your problem-solving companion</p></div>
+    <span class="version">BETA</span>
+  </header>
+
+  <main>
+    <section class="problem-card">
+      <div class="eyebrow" id="platform">CURRENT PROBLEM</div>
+      <h2 id="problem-title">No problem detected yet</h2>
+      <p id="problem-subtitle">Open a LeetCode or Codeforces problem page.</p>
+      <div class="row">
+        <button id="refresh-context" class="button secondary">↻ Read page</button>
+        <a id="open-problem" class="text-link" href="#" target="_blank" rel="noreferrer">Open page ↗</a>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="CodeMate tools">
+      <button class="tab active" data-tab="hints">Hints</button>
+      <button class="tab" data-tab="notes">Notebook</button>
+      <button class="tab" data-tab="review">Code review</button>
+    </nav>
+
+    <section id="hints-panel" class="panel">
+      <div class="section-heading"><div><h2>Think it through</h2><p>Reveal one level at a time.</p></div><span class="pill">LOCAL</span></div>
+      <div class="hint-levels">
+        <button class="hint-level selected" data-level="1">1 <span>Direction</span></button>
+        <button class="hint-level" data-level="2">2 <span>Approach</span></button>
+        <button class="hint-level" data-level="3">3 <span>Details</span></button>
+        <button class="hint-level" data-level="4">4 <span>Complexity</span></button>
+      </div>
+      <div id="hint-output" class="output"><p>Read the problem to generate your first hint.</p></div>
+      <button id="next-hint" class="button primary full">Reveal next hint →</button>
+      <p class="fine-print">Hints are generated locally from page text and simple heuristics. They are suggestions, not a verified solution.</p>
+    </section>
+
+    <section id="notes-panel" class="panel hidden">
+      <div class="section-heading"><div><h2>Problem notebook</h2><p>Notes are saved in this browser.</p></div><span class="pill">LOCAL</span></div>
+      <label for="approach">My approach</label>
+      <textarea id="approach" rows="4" placeholder="Write your idea before checking a solution…"></textarea>
+      <label for="mistakes">Mistakes / edge cases</label>
+      <textarea id="mistakes" rows="3" placeholder="What failed? Which edge cases matter?"></textarea>
+      <button id="save-notes" class="button primary full">Save notes</button>
+      <p id="notes-status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="review-panel" class="panel hidden">
+      <div class="section-heading"><div><h2>Quick code review</h2><p>Paste code if editor reading misses it.</p></div><span class="pill">LOCAL</span></div>
+      <label for="code-input">Your code</label>
+      <textarea id="code-input" rows="10" spellcheck="false" placeholder="Paste your C++ / Python / Java code here…"></textarea>
+      <button id="analyze-code" class="button primary full">Check common issues</button>
+      <div id="review-output" class="output"><p>Checks for common patterns only; this is not a compiler.</p></div>
+    </section>
+
+    <footer><span class="status-dot"></span> Private by default · no code is sent anywhere</footer>
+  </main>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

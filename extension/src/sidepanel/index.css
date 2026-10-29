@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  /* Custom scrollbar for the dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(139, 157, 255, 0.25);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 157, 255, 0.4);
+  }
+
+  /* Selection color */
+  ::selection {
+    background: rgba(102, 120, 245, 0.35);
+  }
+}
+
+@layer components {
+  /* Glassmorphism card */
+  .cm-card {
+    @apply bg-gradient-to-br from-cm-card2 to-cm-card border border-cm-line rounded-[14px] p-4;
+  }
+
+  /* Button styles */
+  .cm-btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm
+           transition-all duration-200 ease-out cursor-pointer border-0;
+  }
+  .cm-btn-primary {
+    @apply cm-btn bg-cm-accent2 text-white hover:bg-cm-accent3 hover:shadow-lg hover:shadow-cm-accent2/20
+           active:scale-[0.98];
+  }
+  .cm-btn-secondary {
+    @apply cm-btn bg-cm-surface text-cm-muted border border-cm-line
+           hover:text-cm-text hover:border-cm-accent/40 active:scale-[0.98];
+  }
+  .cm-btn-ghost {
+    @apply cm-btn bg-transparent text-cm-muted hover:text-cm-text hover:bg-cm-surface/50;
+  }
+  .cm-btn-danger {
+    @apply cm-btn bg-red-500/10 text-cm-red border border-red-500/20
+           hover:bg-red-500/20 active:scale-[0.98];
+  }
+
+  /* Input / Textarea */
+  .cm-input {
+    @apply w-full bg-cm-bg text-cm-text border border-cm-line rounded-lg px-3 py-2.5
+           text-sm font-mono outline-none transition-colors duration-200
+           focus:border-cm-accent placeholder:text-cm-muted/50;
+  }
+  .cm-textarea {
+    @apply cm-input resize-y min-h-[80px];
+  }
+
+  /* Tab navigation */
+  .cm-tab {
+    @apply px-3 py-2 text-xs font-bold text-cm-muted rounded-lg cursor-pointer
+           transition-all duration-200 border-0 bg-transparent
+           hover:text-cm-text hover:bg-cm-surface/50;
+  }
+  .cm-tab-active {
+    @apply cm-tab text-cm-text bg-cm-surface shadow-sm;
+  }
+
+  /* Badge / Pill */
+  .cm-pill {
+    @apply inline-flex items-center px-2 py-0.5 text-[9px] font-extrabold tracking-wider
+           border border-cm-line/60 text-cm-accent bg-cm-surface rounded-full;
+  }
+
+  /* Severity indicators */
+  .cm-severity-error {
+    @apply text-cm-red border-l-2 border-cm-red pl-3;
+  }
+  .cm-severity-warning {
+    @apply text-cm-orange border-l-2 border-cm-orange pl-3;
+  }
+  .cm-severity-info {
+    @apply text-blue-300 border-l-2 border-blue-400/50 pl-3;
+  }
+  .cm-severity-suggestion {
+    @apply text-cm-green border-l-2 border-cm-green/50 pl-3;
+  }
+
+  /* Hint level button */
+  .cm-hint-level {
+    @apply flex flex-col items-center gap-0.5 py-2 px-1 border border-cm-line bg-cm-card
+           text-cm-muted rounded-lg font-extrabold text-sm cursor-pointer
+           transition-all duration-200 hover:border-cm-accent/40;
+  }
+  .cm-hint-level-active {
+    @apply cm-hint-level text-white bg-cm-surface border-cm-accent shadow-md shadow-cm-accent/10;
+  }
+  .cm-hint-level-locked {
+    @apply cm-hint-level opacity-50 cursor-not-allowed;
+  }
+
+  /* Output area */
+  .cm-output {
+    @apply min-h-[120px] p-4 rounded-xl bg-cm-card border border-cm-line
+           text-cm-text/90 text-sm leading-relaxed whitespace-pre-wrap break-words;
+  }
+
+  /* Status dot */
+  .cm-status-dot {
+    @apply w-1.5 h-1.5 rounded-full bg-cm-green;
+  }
+
+  /* Shimmer loading animation */
+  .cm-shimmer {
+    @apply bg-gradient-to-r from-cm-card via-cm-surface to-cm-card bg-[length:200%_100%] animate-shimmer rounded-lg;
+  }
+}

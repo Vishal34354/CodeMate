@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "CodeMate — Coding Companion",
+  "version": "0.1.0",
+  "description": "Progressive hints, problem context, and a personal notebook for LeetCode and Codeforces.",
+  "permissions": ["sidePanel", "storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "https://www.leetcode.com/*",
+    "https://codeforces.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open CodeMate"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/problems/*",
+        "https://www.leetcode.com/problems/*",
+        "https://codeforces.com/problemset/problem/*",
+        "https://codeforces.com/contest/*/problem/*",
+        "https://codeforces.com/gym/*/problem/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
