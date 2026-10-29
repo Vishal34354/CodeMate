@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "validate": "node scripts/validate-build.cjs",
+    "package": "node scripts/package-extension.cjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
