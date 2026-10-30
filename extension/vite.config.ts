@@ -59,6 +59,16 @@ export default defineConfig({
         chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash].[ext]",
+        manualChunks: {
+          "markdown-math": [
+            "katex",
+            "rehype-katex",
+            "remark-math",
+            "react-markdown",
+            "remark-gfm",
+          ],
+          jszip: ["jszip"],
+        },
       },
     },
   },

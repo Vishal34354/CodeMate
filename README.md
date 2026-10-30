@@ -98,15 +98,64 @@ GitHub Actions will automatically build, validate, package, and publish the rele
 
 ---
 
+## 📚 Spaced Repetition Export: Anki & Obsidian
+
+CodeMate features production-quality export tools directly inside the **Notes** tab for seamless integration with Anki and Obsidian.
+
+### 📇 Anki Flashcards Export (.tsv)
+CodeMate exports an Anki-compatible Tab-Separated Values (`.tsv`) file formatted with native HTML styling, MathJax mathematical formula support, and automatic hierarchical tags.
+
+#### Card Templates Generated:
+1. **Key Observation / Invariant Card**:
+   - **Front**: Problem Title, Platform, Problem Link + "What is the core key observation or invariant for this problem?"
+   - **Back**: Key realization, monotonicity properties, or state definitions.
+2. **Optimal Algorithm & Complexity Card**:
+   - **Front**: Problem Title, Platform + "What is the peak optimal algorithm and asymptotic complexity?"
+   - **Back**: Step-by-step algorithmic formulation and $O(...)$ Time/Space bounds.
+3. **Mistakes & Edge Cases Card** *(generated when notes are present)*:
+   - **Front**: Problem Title + "What mistakes or edge cases should you watch out for?"
+   - **Back**: Exact pitfall explanations (integer overflow, off-by-one bounds, zero corner-cases).
+
+#### How to Import into Anki:
+1. In CodeMate's **Notes** tab, click **Export** (or quick-export from the current note) and choose **Anki Flashcards**.
+2. Download the `.tsv` file (e.g. `codemate-anki-cards-2026-10-29.tsv`).
+3. Open **Anki** desktop application.
+4. Click **File → Import...** (or press `Ctrl+I` / `Cmd+I`).
+5. Select the downloaded `.tsv` file.
+6. Verify settings:
+   - **Field separator**: Tab
+   - **Allow HTML in fields**: Checked (Enabled)
+   - **Target Deck**: `CodeMate::CompetitiveProgramming` (or your preferred deck)
+7. Click **Import**. Your cards are ready for spaced repetition review!
+
+---
+
+### 💎 Obsidian Vault Export (.zip / .md)
+Export your problem notes into rich Markdown documents formatted with Obsidian-compatible YAML frontmatter.
+
+#### Note Structure:
+- **YAML Frontmatter**: Includes `title`, `platform`, `url`, `difficulty`, `review_status`, `review_count`, `next_review_date`, and topic `tags`.
+- **Markdown Body**: Clean headings for `💡 Key Observations & Invariants`, `🚀 Algorithmic Approach`, `⏱️ Complexity Analysis`, and `⚠️ Mistakes & Pitfalls`.
+- **00_Index.md Table of Contents**: Generates an overview dashboard with internal Obsidian wiki-links (`[[Problem Name]]`), difficulty indicators, and review dates.
+
+#### How to Import into Obsidian:
+1. In CodeMate's **Notes** tab, click **Export** and choose **Obsidian Vault**.
+2. Download the `.zip` archive (e.g. `codemate-obsidian-vault-2026-10-29.zip`).
+3. Extract the contents directly into your Obsidian vault folder (e.g. `MyVault/LeetCode/` or `MyVault/CodeMate/`).
+4. Open Obsidian: all notes and the `00_Index.md` dashboard will link seamlessly.
+
+---
+
 ## 🧪 Automated Test Verification
 
 All tests run cleanly in both local and CI environments:
 
-### Extension Unit Tests (18 tests passing)
+### Extension Unit Tests (28 tests passing)
 ```bash
 cd extension
 npm test
 ```
+- `src/__tests__/export.test.ts` (10 tests): Anki TSV generation, card template separation, YAML escaping, Unicode & emoji safety, path traversal prevention, and Obsidian ZIP packaging.
 - `src/__tests__/utils.test.ts` (7 tests): URL normalization for LeetCode, Codeforces problemsets, contests, gyms; platform detection; SRS intervals.
 - `src/__tests__/hints.test.ts` (3 tests): 4-stage progressive hint unlock logic and resets.
 - `src/__tests__/code-review.test.ts` (4 tests): Static AST heuristics (integer overflow, unsigned loops, recursion bounds).
@@ -152,11 +201,11 @@ CodeMate/
 │   │   ├── sidepanel/             # React 18 + Tailwind CSS dark-mode side panel
 │   │   │   ├── components/        # Header, Navigation, ErrorBoundary, MarkdownRenderer
 │   │   │   ├── pages/             # Problem, Hints, Explain, Debug, Notes, Progress, Settings
-│   │   │   ├── services/          # Multi-model AI fallback, hint engine, code review
+│   │   │   ├── services/          # Multi-model AI fallback, hint engine, code review, Anki/Obsidian export
 │   │   │   └── hooks/             # Reactive context & storage hooks
 │   │   ├── storage/               # Schema-versioned chrome.storage manager
 │   │   ├── types/                 # Shared TypeScript interfaces
-│   │   └── __tests__/             # Vitest test suite (18 tests)
+│   │   └── __tests__/             # Vitest test suite (28 tests)
 │   ├── dist/                      # Production build for "Load unpacked"
 │   └── vite.config.ts             # Rollup multi-entry with relative base & esbuild bundling
 │

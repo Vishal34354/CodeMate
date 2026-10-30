@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import type { NotebookEntry, ProblemContext } from "@/types";
 import type { useNotebook } from "@/sidepanel/hooks";
+import {
+  generateAnkiTsv,
+  generateObsidianMarkdown,
+  generateObsidianZip,
+  sanitizeFilename,
+} from "@/sidepanel/services/export-service";
 
 interface Props {
   notebook: ReturnType<typeof useNotebook>;
@@ -28,6 +34,18 @@ export function NotebookPage({ notebook, context }: Props) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importJsonText, setImportJsonText] = useState("");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Multi-selection state for Library view
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Export Modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"anki" | "obsidian" | "json">("anki");
+  const [ankiCardType, setAnkiCardType] = useState<"split" | "comprehensive">("split");
+  const [ankiDeckName, setAnkiDeckName] = useState("CodeMate::CompetitiveProgramming");
+  const [obsidianIncludeIndex, setObsidianIncludeIndex] = useState(true);
+  const [exportScope, setExportScope] = useState<"selected" | "all" | "current">("all");
+  const [exportSuccessMessage, setExportSuccessMessage] = useState("");
 
   // Local state for current entry editing
   const [approach, setApproach] = useState(currentEntry?.approach || "");
@@ -65,15 +83,94 @@ export function NotebookPage({ notebook, context }: Props) {
     await save(updated);
   };
 
-  const handleExportDownload = async () => {
-    const jsonStr = await doExport();
-    const blob = new Blob([jsonStr], { type: "application/json" });
+  // Helper to trigger browser file download
+  const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `codemate-notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Quick export single entry to Anki
+  const handleQuickExportAnki = (entry: NotebookEntry) => {
+    const tsv = generateAnkiTsv([entry], { cardType: "split", deckName: ankiDeckName });
+    const blob = new Blob([tsv], { type: "text/tab-separated-values;charset=utf-8" });
+    const filename = `${sanitizeFilename(entry.title || "note")}-anki.tsv`;
+    triggerDownload(blob, filename);
+    flashExport(`Exported Anki TSV: ${filename}`);
+  };
+
+  // Quick export single entry to Obsidian
+  const handleQuickExportObsidian = (entry: NotebookEntry) => {
+    const md = generateObsidianMarkdown(entry);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const filename = `${sanitizeFilename(entry.title || "note")}.md`;
+    triggerDownload(blob, filename);
+    flashExport(`Exported Obsidian Markdown: ${filename}`);
+  };
+
+  // Bulk or targeted export execution
+  const executeExport = async () => {
+    let targetEntries: NotebookEntry[] = [];
+
+    if (exportScope === "current" && currentEntry) {
+      targetEntries = [currentEntry];
+    } else if (exportScope === "selected") {
+      targetEntries = allEntries.filter((e) => selectedIds.has(e.id));
+      if (targetEntries.length === 0) {
+        targetEntries = allEntries;
+      }
+    } else {
+      targetEntries = allEntries;
+    }
+
+    if (targetEntries.length === 0) {
+      alert("No notes available to export.");
+      return;
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+
+    if (exportFormat === "anki") {
+      const tsv = generateAnkiTsv(targetEntries, {
+        cardType: ankiCardType,
+        deckName: ankiDeckName.trim() || "CodeMate::CompetitiveProgramming",
+      });
+      const blob = new Blob([tsv], { type: "text/tab-separated-values;charset=utf-8" });
+      const filename = `codemate-anki-cards-${timestamp}.tsv`;
+      triggerDownload(blob, filename);
+      flashExport(`Exported ${targetEntries.length} notes to Anki TSV!`);
+      setShowExportModal(false);
+    } else if (exportFormat === "obsidian") {
+      if (targetEntries.length === 1) {
+        handleQuickExportObsidian(targetEntries[0]);
+        setShowExportModal(false);
+      } else {
+        const zipBlob = await generateObsidianZip(targetEntries, {
+          includeIndex: obsidianIncludeIndex,
+        });
+        const filename = `codemate-obsidian-vault-${timestamp}.zip`;
+        triggerDownload(zipBlob, filename);
+        flashExport(`Exported ${targetEntries.length} notes into Obsidian ZIP!`);
+        setShowExportModal(false);
+      }
+    } else if (exportFormat === "json") {
+      const jsonStr = JSON.stringify({ version: 1, entries: targetEntries }, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const filename = `codemate-notes-backup-${timestamp}.json`;
+      triggerDownload(blob, filename);
+      flashExport(`Exported ${targetEntries.length} notes to JSON!`);
+      setShowExportModal(false);
+    }
+  };
+
+  const flashExport = (msg: string) => {
+    setExportSuccessMessage(msg);
+    setTimeout(() => setExportSuccessMessage(""), 4000);
   };
 
   const handleImportSubmit = async () => {
@@ -81,6 +178,26 @@ export function NotebookPage({ notebook, context }: Props) {
     await doImport(importJsonText);
     setImportJsonText("");
     setShowImportModal(false);
+  };
+
+  // Toggle selection for single entry
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredList.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredList.map((e) => e.id)));
+    }
   };
 
   const filteredList = allEntries.filter((item) => {
@@ -115,9 +232,9 @@ export function NotebookPage({ notebook, context }: Props) {
           </button>
         </div>
 
-        {statusMessage && (
+        {(statusMessage || exportSuccessMessage) && (
           <span className="text-xs font-semibold text-cm-green animate-fade-in">
-            {statusMessage}
+            {exportSuccessMessage || statusMessage}
           </span>
         )}
       </div>
@@ -271,6 +388,31 @@ export function NotebookPage({ notebook, context }: Props) {
                   </button>
                 </div>
               </div>
+
+              {/* Direct Export Strip for Current Note */}
+              <div className="p-2.5 rounded-xl bg-cm-surface/30 border border-cm-line/50 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-cm-muted flex items-center gap-1.5">
+                  <span>🚀</span> Export Current Note:
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickExportAnki(currentEntry)}
+                    className="px-2.5 py-1 rounded bg-cm-surface hover:bg-cm-accent2/20 text-cm-accent text-[11px] font-semibold border border-cm-line transition-colors flex items-center gap-1"
+                    title="Export as Anki flashcards TSV"
+                  >
+                    <span>📇</span> Anki (.tsv)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickExportObsidian(currentEntry)}
+                    className="px-2.5 py-1 rounded bg-cm-surface hover:bg-cm-accent2/20 text-cm-accent text-[11px] font-semibold border border-cm-line transition-colors flex items-center gap-1"
+                    title="Export as Obsidian Markdown (.md)"
+                  >
+                    <span>💎</span> Obsidian (.md)
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -297,7 +439,7 @@ export function NotebookPage({ notebook, context }: Props) {
               className="cm-input text-xs"
             />
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
               <div className="flex gap-1.5">
                 {(["all", "LeetCode", "Codeforces"] as const).map((p) => (
                   <button
@@ -314,23 +456,47 @@ export function NotebookPage({ notebook, context }: Props) {
                 ))}
               </div>
 
+              {/* Action Buttons */}
               <div className="flex gap-1.5">
                 <button
-                  onClick={handleExportDownload}
-                  className="cm-btn-secondary text-[10px] py-1 px-2"
-                  title="Export all notes to JSON backup"
+                  onClick={() => {
+                    setExportScope(selectedIds.size > 0 ? "selected" : "all");
+                    setShowExportModal(true);
+                  }}
+                  className="cm-btn-primary text-[10px] py-1 px-2.5 flex items-center gap-1 font-bold"
+                  title="Export notes to Anki, Obsidian, or JSON"
                 >
-                  Export JSON
+                  <span>📤</span> Export {selectedIds.size > 0 ? `(${selectedIds.size})` : "All"}
                 </button>
                 <button
                   onClick={() => setShowImportModal(true)}
                   className="cm-btn-secondary text-[10px] py-1 px-2"
                   title="Import notes from JSON backup"
                 >
-                  Import JSON
+                  Import
                 </button>
               </div>
             </div>
+
+            {/* Select All Bar */}
+            {filteredList.length > 0 && (
+              <div className="flex items-center justify-between px-1 text-[11px] text-cm-muted">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredList.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-cm-line text-cm-accent2 focus:ring-0 cursor-pointer"
+                  />
+                  <span>Select all ({filteredList.length})</span>
+                </label>
+                {selectedIds.size > 0 && (
+                  <span className="text-cm-accent font-semibold">
+                    {selectedIds.size} selected
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Notes Cards List */}
@@ -344,54 +510,93 @@ export function NotebookPage({ notebook, context }: Props) {
             </div>
           ) : (
             <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-              {filteredList.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="cm-card hover:border-cm-accent/40 transition-all cursor-pointer p-3 space-y-2"
-                  onClick={() => {
-                    setCurrentEntry(entry);
-                    setActiveTab("current");
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="cm-pill">{entry.platform.toUpperCase()}</span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ${
-                        entry.reviewStatus === "mastered"
-                          ? "bg-cm-green/20 text-cm-green"
-                          : entry.reviewStatus === "reviewing"
-                          ? "bg-cm-accent/20 text-cm-accent"
-                          : "bg-cm-surface text-cm-muted"
-                      }`}
-                    >
-                      {entry.reviewStatus}
-                    </span>
+              {filteredList.map((entry) => {
+                const isSelected = selectedIds.has(entry.id);
+                return (
+                  <div
+                    key={entry.id}
+                    className={`cm-card hover:border-cm-accent/40 transition-all cursor-pointer p-3 space-y-2 ${
+                      isSelected ? "border-cm-accent bg-cm-accent2/10" : ""
+                    }`}
+                    onClick={() => {
+                      setCurrentEntry(entry);
+                      setActiveTab("current");
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onClick={(e) => toggleSelect(entry.id, e)}
+                          onChange={() => {}}
+                          className="rounded border-cm-line text-cm-accent2 focus:ring-0 cursor-pointer"
+                        />
+                        <span className="cm-pill">{entry.platform.toUpperCase()}</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ${
+                          entry.reviewStatus === "mastered"
+                            ? "bg-cm-green/20 text-cm-green"
+                            : entry.reviewStatus === "reviewing"
+                            ? "bg-cm-accent/20 text-cm-accent"
+                            : "bg-cm-surface text-cm-muted"
+                        }`}
+                      >
+                        {entry.reviewStatus}
+                      </span>
+                    </div>
+
+                    <h4 className="text-xs font-bold text-cm-text leading-snug">{entry.title}</h4>
+
+                    {entry.observations && (
+                      <p className="text-[11px] text-cm-muted line-clamp-2 leading-relaxed">
+                        {entry.observations}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-[10px] text-cm-muted pt-1 border-t border-cm-line/50">
+                      <span>
+                        Review: {entry.nextReviewDate ? new Date(entry.nextReviewDate).toLocaleDateString() : "None"}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickExportAnki(entry);
+                          }}
+                          className="text-cm-accent hover:underline"
+                          title="Export single Anki note"
+                        >
+                          Anki
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickExportObsidian(entry);
+                          }}
+                          className="text-cm-accent hover:underline"
+                          title="Export single Obsidian note"
+                        >
+                          Obsidian
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(entry.id);
+                          }}
+                          className="text-cm-red hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
-
-                  <h4 className="text-xs font-bold text-cm-text leading-snug">{entry.title}</h4>
-
-                  {entry.observations && (
-                    <p className="text-[11px] text-cm-muted line-clamp-2 leading-relaxed">
-                      {entry.observations}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-[10px] text-cm-muted pt-1 border-t border-cm-line/50">
-                    <span>
-                      Review: {entry.nextReviewDate ? new Date(entry.nextReviewDate).toLocaleDateString() : "None"}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        remove(entry.id);
-                      }}
-                      className="text-cm-red hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -406,6 +611,176 @@ export function NotebookPage({ notebook, context }: Props) {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Export Hub Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-cm-card border border-cm-line rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-cm-line pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📤</span>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Export Problem Notes
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-cm-muted hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scope Selection */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-cm-muted block">Export Scope</label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setExportScope("all")}
+                  className={`p-2 rounded-lg border font-semibold text-left transition-colors ${
+                    exportScope === "all"
+                      ? "border-cm-accent bg-cm-accent2/15 text-white"
+                      : "border-cm-line bg-cm-surface/50 text-cm-muted hover:text-white"
+                  }`}
+                >
+                  All Notes ({allEntries.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportScope("selected")}
+                  className={`p-2 rounded-lg border font-semibold text-left transition-colors ${
+                    exportScope === "selected"
+                      ? "border-cm-accent bg-cm-accent2/15 text-white"
+                      : "border-cm-line bg-cm-surface/50 text-cm-muted hover:text-white"
+                  }`}
+                >
+                  Selected Notes ({selectedIds.size})
+                </button>
+              </div>
+            </div>
+
+            {/* Format Selection Tabs */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-cm-muted block">Destination Format</label>
+              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-cm-surface border border-cm-line text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setExportFormat("anki")}
+                  className={`py-1.5 rounded-md transition-all ${
+                    exportFormat === "anki"
+                      ? "bg-cm-accent2 text-white shadow"
+                      : "text-cm-muted hover:text-white"
+                  }`}
+                >
+                  📇 Anki Flashcards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportFormat("obsidian")}
+                  className={`py-1.5 rounded-md transition-all ${
+                    exportFormat === "obsidian"
+                      ? "bg-cm-accent2 text-white shadow"
+                      : "text-cm-muted hover:text-white"
+                  }`}
+                >
+                  💎 Obsidian Vault
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportFormat("json")}
+                  className={`py-1.5 rounded-md transition-all ${
+                    exportFormat === "json"
+                      ? "bg-cm-accent2 text-white shadow"
+                      : "text-cm-muted hover:text-white"
+                  }`}
+                >
+                  📄 JSON Backup
+                </button>
+              </div>
+            </div>
+
+            {/* Format Specific Configuration */}
+            {exportFormat === "anki" && (
+              <div className="p-3 rounded-lg bg-cm-surface/30 border border-cm-line space-y-2.5">
+                <div>
+                  <label className="text-[10px] font-bold text-cm-muted block mb-1">
+                    Card Template Structure
+                  </label>
+                  <select
+                    value={ankiCardType}
+                    onChange={(e) => setAnkiCardType(e.target.value as "split" | "comprehensive")}
+                    className="cm-input text-xs w-full"
+                  >
+                    <option value="split">
+                      Split Cards (Separate Observation, Algorithm & Pitfall cards)
+                    </option>
+                    <option value="comprehensive">
+                      Comprehensive Card (1 single card per problem with all notes)
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-cm-muted block mb-1">
+                    Target Anki Deck Name
+                  </label>
+                  <input
+                    type="text"
+                    value={ankiDeckName}
+                    onChange={(e) => setAnkiDeckName(e.target.value)}
+                    placeholder="CodeMate::CompetitiveProgramming"
+                    className="cm-input text-xs font-mono w-full"
+                  />
+                </div>
+                <p className="text-[10px] text-cm-muted leading-relaxed">
+                  💡 Generates a TSV file with HTML styling, KaTeX math compatibility, and tags. Import via Anki: <strong>File → Import → select TSV</strong>.
+                </p>
+              </div>
+            )}
+
+            {exportFormat === "obsidian" && (
+              <div className="p-3 rounded-lg bg-cm-surface/30 border border-cm-line space-y-2.5">
+                <label className="flex items-center gap-2 text-xs text-cm-text cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={obsidianIncludeIndex}
+                    onChange={(e) => setObsidianIncludeIndex(e.target.checked)}
+                    className="rounded border-cm-line text-cm-accent2 focus:ring-0"
+                  />
+                  <span>Generate <code>00_Index.md</code> Table of Contents with wiki-links</span>
+                </label>
+                <p className="text-[10px] text-cm-muted leading-relaxed">
+                  💎 Generates Markdown notes with YAML frontmatter (tags, platform, difficulty, review dates). Simply extract the downloaded ZIP into your Obsidian vault!
+                </p>
+              </div>
+            )}
+
+            {exportFormat === "json" && (
+              <div className="p-3 rounded-lg bg-cm-surface/30 border border-cm-line text-[11px] text-cm-muted">
+                Complete raw JSON export of your problem notes, attempt records, and revision schedules for full portability and backup.
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="cm-btn-ghost text-xs py-1.5 px-3"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeExport}
+                className="cm-btn-primary text-xs py-2 px-4 shadow-lg shadow-cm-accent2/25 font-bold flex items-center gap-1.5"
+              >
+                <span>💾</span> Download Export
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -425,8 +800,8 @@ export function NotebookPage({ notebook, context }: Props) {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  clearAll();
+                onClick={async () => {
+                  await clearAll();
                   setShowClearConfirm(false);
                 }}
                 className="cm-btn-danger text-xs py-1.5 px-3"
