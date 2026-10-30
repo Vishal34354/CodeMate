@@ -94,14 +94,17 @@ ${req.additionalContext ? `Context: ${req.additionalContext}` : ""}`;
   let lastError = "";
 
   for (const candidate of candidateModels) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidate}:generateContent`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000);
 
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey.trim(),
+        },
         signal: controller.signal,
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
